@@ -1,12 +1,8 @@
-use axum::{http::StatusCode, routing::post, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use std::str::FromStr;
-use tokio::net::TcpListener;
+use tokio::{fs::File, io::AsyncReadExt, net::TcpListener};
 use tracing::{info, Level};
 use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
-
-// FIXME: read from file
-static TRUSTED_CLIENTS: [&str; 1] =
-    ["nodekey:99233562637da21f590cbffa4b6b621adba721f12a2375ac1d63f8656cdb7a24"];
 
 #[tokio::main]
 async fn main() {
@@ -26,8 +22,25 @@ async fn main() {
         .parse()
         .unwrap();
 
-    let app = Router::new().route("/", post(root));
-    // TODO: take port from env
+    // read trusted clients from file
+    let mut buf = String::new();
+    File::open("trusted_clients.txt")
+        .await
+        .unwrap()
+        .read_to_string(&mut buf)
+        .await
+        .unwrap();
+
+    let trusted_clients: Vec<String> = buf
+        .lines()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_owned())
+        .collect();
+
+    let app = Router::new()
+        .route("/", post(root))
+        .with_state(trusted_clients);
+
     let listener = TcpListener::bind((addr.as_str(), port)).await.unwrap();
     info!("Listening at {addr}:{port}");
     axum::serve(listener, app).await.unwrap();
@@ -41,8 +54,11 @@ struct DERPAdmitClientRequest {
     // source_ip: String,
 }
 
-async fn root(Json(payload): Json<DERPAdmitClientRequest>) -> (StatusCode, &'static str) {
-    let is_trusted = TRUSTED_CLIENTS.contains(&payload.node_public.as_str());
+async fn root(
+    State(trusted_clients): State<Vec<String>>,
+    Json(payload): Json<DERPAdmitClientRequest>,
+) -> (StatusCode, &'static str) {
+    let is_trusted = trusted_clients.contains(&payload.node_public);
     info!(
         "Trusted: {} for node_public: {}",
         is_trusted, payload.node_public
