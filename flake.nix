@@ -55,7 +55,7 @@
           let
             cfg = config.services.derper-verifier;
             writeTrustedClients = clients:
-              pkgs.writeText "trusted_clients.txt"
+              pkgs.writeText "trusted-clients"
                 (builtins.concatStringsSep "\n" clients);
           in
           with lib;
@@ -85,7 +85,7 @@
                   # TODO: Make these options
                   "DERPER_VERIFIER_ADDR=127.0.0.1"
                   "DERPER_VERIFIER_ADDR=3000"
-                  "DERPER_VERIFIER_CONFIG=${writeTrustedClients cfg.trustedClients}/trusted_clients.txt"
+                  "DERPER_VERIFIER_CONFIG=${writeTrustedClients cfg.trustedClients}"
                 ];
               };
             };
