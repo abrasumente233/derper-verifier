@@ -1,5 +1,8 @@
 use axum::{http::StatusCode, routing::post, Json, Router};
+use std::str::FromStr;
 use tokio::net::TcpListener;
+use tracing::{info, Level};
+use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
 // FIXME: read from file
 static TRUSTED_CLIENTS: [&str; 1] =
@@ -7,10 +10,26 @@ static TRUSTED_CLIENTS: [&str; 1] =
 
 #[tokio::main]
 async fn main() {
-    println!("running");
+    // init tracing
+    let filter = Targets::from_str(std::env::var("RUST_LOG").as_deref().unwrap_or("info"))
+        .expect("Invalid RUST_LOG value");
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .finish()
+        .with(filter)
+        .init();
+
+    // get the listen address and port from env
+    let addr = std::env::var("DERPER_VERIFIER_ADDR").unwrap_or("127.0.0.1".to_string());
+    let port: u16 = std::env::var("DERPER_VERIFIER_PORT")
+        .unwrap_or("3000".to_string())
+        .parse()
+        .unwrap();
+
     let app = Router::new().route("/", post(root));
     // TODO: take port from env
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind((addr.as_str(), port)).await.unwrap();
+    info!("Listening at {addr}:{port}");
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -23,9 +42,12 @@ struct DERPAdmitClientRequest {
 }
 
 async fn root(Json(payload): Json<DERPAdmitClientRequest>) -> (StatusCode, &'static str) {
-    println!("payload: {:?}", payload);
-    // check if node_public is in TRUSTED_CLIENTS
-    if TRUSTED_CLIENTS.contains(&payload.node_public.as_str()) {
+    let is_trusted = TRUSTED_CLIENTS.contains(&payload.node_public.as_str());
+    info!(
+        "Trusted: {} for node_public: {}",
+        is_trusted, payload.node_public
+    );
+    if is_trusted {
         (StatusCode::OK, "OK")
     } else {
         (StatusCode::UNAUTHORIZED, "Unauthorized")
