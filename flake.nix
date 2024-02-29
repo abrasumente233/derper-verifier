@@ -58,6 +58,7 @@
               pkgs.writeText "trusted_clients.txt"
                 (builtins.concatStringsSep "\n" clients);
           in
+          with lib;
           {
             options.services.derper-verifier = {
               enable = mkOption {
