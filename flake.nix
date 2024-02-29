@@ -84,7 +84,7 @@
                   "RUST_LOG=info"
                   # TODO: Make these options
                   "DERPER_VERIFIER_ADDR=127.0.0.1"
-                  "DERPER_VERIFIER_ADDR=3000"
+                  "DERPER_VERIFIER_PORT=3000"
                   "DERPER_VERIFIER_CONFIG=${writeTrustedClients cfg.trustedClients}"
                 ];
               };
