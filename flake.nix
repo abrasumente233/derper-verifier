@@ -51,5 +51,43 @@
         devShells.default = mkShell {
           inputsFrom = [ bin ];
         };
+        nixosModules.default = { self, config, lib, pkgs, ... }:
+          let
+            cfg = config.services.derper-verifier;
+            writeTrustedClients = clients:
+              pkgs.writeText "trusted_clients.txt"
+                (builtins.concatStringsSep "\n" clients);
+          in
+          {
+            options.services.derper-verifier = {
+              enable = mkOption {
+                default = false;
+                description = "Enable the derper-verifier systemd service";
+              };
+              trustedClients = mkOption {
+                default = "";
+                description = "A list of trusted clients, one per line";
+              };
+            };
+
+            config.systemd.services.derper-verifier = mkIf cfg.enable {
+              description = "A verifier for the --verify-clients-url feature of custom Tailscale derpers";
+              wantedBy = [ "multi-user.target" ];
+              serviceConfig = {
+                Type = "simple";
+                ExecStart = "${bin}/bin/derper-verifier";
+                Restart = "always";
+                RestartSec = "30";
+                DynamicUser = true;
+                Environment = [
+                  "RUST_LOG=info"
+                  # TODO: Make these options
+                  "DERPER_VERIFIER_ADDR=127.0.0.1"
+                  "DERPER_VERIFIER_ADDR=3000"
+                  "DERPER_VERIFIER_CONFIG=${writeTrustedClients cfg.trustedClients}/trusted_clients.txt"
+                ];
+              };
+            };
+          };
       });
 }
