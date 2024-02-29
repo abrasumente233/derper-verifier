@@ -24,7 +24,9 @@ async fn main() {
 
     // read trusted clients from file
     let mut buf = String::new();
-    File::open("trusted_clients.txt")
+    let config_file =
+        std::env::var("DERPER_VERIFIER_CONFIG").unwrap_or("trusted_clients.txt".to_string());
+    File::open(config_file)
         .await
         .unwrap()
         .read_to_string(&mut buf)
